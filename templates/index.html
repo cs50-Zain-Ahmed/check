@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Login App</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+</head>
+<body>
+    <div id="loginSection">
+        <h1>Login Options</h1>
+        <div id="loginButtons">
+            <button id="loginWithEmail">Login with Email/Password</button>
+            <button id="loginWithFaceRecognition">Login with Face Recognition</button>
+            <p id="loginOptionsText">Select an option to log in</p>
+        </div>
+    </div>
+
+    <div id="webcamCapture" style="display: none;">
+        <h2>Face Recognition</h2>
+        <video id="video" width="640" height="480" autoplay></video>
+        <canvas id="canvas" width="640" height="480" style="display: none;"></canvas>
+        <p id="processingMessage"><b>Processing...</b></p>
+    </div>
+
+    <div id="emailLoginSection" style="display: none;">
+        <h2>Email/Password Login</h2>
+        <input type="email" id="email" placeholder="Enter your email"><br>
+        <input type="password" id="password" placeholder="Enter your password"><br>
+        <button id="login">Login</button>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+
+            $('#loginWithFaceRecognition').click(function() {
+                $('#loginSection').hide();
+                $('#webcamCapture').show();
+                startWebcamCapture();
+            });
+
+            $('#loginWithEmail').click(function() {
+                $('#loginSection').hide();
+                $('#emailLoginSection').show();
+            });
+
+            $('#login').click(function() {
+                loginWithEmail();
+            });
+
+            function startWebcamCapture() {
+            $('#processingMessage').text('Initializing webcam...').css('font-weight', 'bold'); // Show processing message
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(function(stream) {
+                    $('#processingMessage').text('Detecting your face...').css('font-weight', 'bold');
+                        video.srcObject = stream;
+                        setTimeout(captureImage, 1000); // Capture image after 1 second
+                    })
+                    .catch(function(err) {
+                        console.error('Error accessing the webcam: ', err);
+                    });
+            }
+
+            function captureImage() {
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                $('#processingMessage').show(); // Show processing message
+                canvas.toBlob(function(blob) {
+                    const formData = new FormData();
+                    formData.append('image', blob);
+                    fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => {
+                        $('#processingMessage').hide(); // Hide processing message
+                        if (!response.ok) {
+                            throw new Error('Failed to upload image.');
+                        }
+                        console.log('Image sent successfully.');
+                        return response.json(); // Parse JSON only if response is OK
+                    })
+                    .then(data => {
+                        console.log(data); // Log the response data for debugging
+                        // Now you can handle the data according to its status
+                        if (data.status === 'success') {
+                            alert(data.message);
+                            window.location.reload(); // Reload the page on successful login
+                        } else {
+                            alert(data.message);
+                            window.location.reload();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error sending image: ', error);
+                    });
+                });
+            }
+
+            function loginWithEmail() {
+                const email = $('#email').val();
+                const password = $('#password').val();
+                const requestBody = JSON.stringify({
+                    email: email,
+                    password: password
+                });
+                fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: requestBody
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    if (data.status === 'success') {
+                        window.location.reload();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
